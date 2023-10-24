@@ -1,21 +1,6 @@
 import random
 
 
-def calculate_slope(point1, point2):
-	"""
-	simple calculation of slope = rise/run
-	:param point1:
-	:param point2:
-	:return:
-	"""
-	x1, y1 = point1[0], point1[1]
-	x2, y2 = point2[0], point2[1]
-	if y2 - y1 == 0:
-		return 1e10  # slope is undefined
-	else:
-		return (x2 - x1) / (y2 - y1)
-
-
 def get_robot_corners(cur_pos):
 	"""
 	given a row and column, attempt toget robot wheel locations (refer to image)
@@ -34,7 +19,7 @@ def get_robot_corners(cur_pos):
 		front_left = (row - 1, col - 1)
 		front_right = (row - 1, col + 1)
 		back_left = (row + 1, col - 1)
-		back_right = (row + 1, col - 1)
+		back_right = (row + 1, col + 1)
 		return front_left, front_right, back_left, back_right
 
 
@@ -56,22 +41,49 @@ class Environment:
 		self.board = self.create_board(flat=False, mostlyFlat=True)
 		self.robot_position = None
 
+	def calculate_slope(self, point1, point2, pitch=False):
+		"""
+		simple calculation of slope = rise/run
+		:param pitch: If true, calculate pitch, if false, calculate roll
+		:param point1:
+		:param point2:
+		:return:
+		"""
+		x1, y1, h1 = point1[0], point1[1], self.board[point1[0]][point1[1]]
+		x2, y2, h2 = point2[0], point2[1], self.board[point2[0]][point2[1]]
+
+		if not pitch:  # forward back, think ship pitching up and down
+			if y2 - y1 == 0:
+				return 1e10  # slope is undefined
+			else:
+				return (h2 - h1) / (y2 - y1)
+		else:  # left right, think plane rolling left and right
+			if x2 - x1 == 0:
+				return 1e10  # slope is undefined
+			else:
+				return (h2 - h1) / (x2 - x1)
+
 	def display_world(self):
 		if self.board and self.robot_position is None:
 			for row in self.board:
 				print(row)
 		elif self.board and self.robot_position:
-			corners = set(get_robot_corners(self.robot_position))
+			corners = get_robot_corners(self.robot_position)
+			print("-"*82)
 			for i in range(self.R):
+				print ("|", end=" ")
 				for j in range(self.C):
 					if (i,j) in corners:
-						print(" W", end="\t\t")
+						print("\033[1;32;40m   W   \033[00m", end="|")
 					elif (i,j) == self.robot_position:
-						print(" C", end="\t\t")
+						print("\033[1;32;40m   R   \033[00m", end="|")
 					else:
-						print(self.board[i][j], end="\t")
-
-				print("", end="\n")
+						if self.board[i][j] < 0:
+							print(' {:.2f}'.format(self.board[i][j]), end=" |")
+						else:
+							print('  {:.2f}'.format(self.board[i][j]), end=" |")
+				print("\n", end="")
+				print("-" * 82)
 
 	def isValid_row(self, row):
 		return not (row == 0 or row == self.R or row == self.R - 1)
@@ -104,7 +116,7 @@ class Environment:
 			for row in range(self.R):
 				row = []
 				for col in range(self.C):
-					if random.random() % 2 == 0:
+					if random.random() > 0.5:
 						row.append(round(0 + random.random(), 2))
 					else:
 						row.append(round(0 - random.random(), 2))
@@ -221,11 +233,11 @@ class Environment:
 		if corners == -1:
 			return None
 
-		forward_roll = calculate_slope(corners[0], corners[1])
-		backward_roll = calculate_slope(corners[2], corners[3])
+		forward_roll = self.calculate_slope(corners[0], corners[1], pitch=False)
+		backward_roll = self.calculate_slope(corners[2], corners[3], pitch=False)
 
-		forward_pitch = calculate_slope(corners[0], corners[2])
-		backward_pitch = calculate_slope(corners[1], corners[3])
+		forward_pitch = self.calculate_slope(corners[0], corners[2], pitch=True)
+		backward_pitch = self.calculate_slope(corners[1], corners[3], pitch=True)
 
 		return forward_roll, backward_roll, forward_pitch, backward_pitch
 
@@ -248,11 +260,11 @@ class Environment:
 		if projected_corners == -1:
 			return None
 
-		forward_roll = calculate_slope(projected_corners[0], projected_corners[1])
-		backward_roll = calculate_slope(projected_corners[2], projected_corners[3])
+		forward_roll = self.calculate_slope(projected_corners[0], projected_corners[1], pitch=False)
+		backward_roll = self.calculate_slope(projected_corners[2], projected_corners[3], pitch=False)
 
-		forward_pitch = calculate_slope(projected_corners[0], projected_corners[2])
-		backward_pitch = calculate_slope(projected_corners[1], projected_corners[3])
+		forward_pitch = self.calculate_slope(projected_corners[0], projected_corners[2], pitch=True)
+		backward_pitch = self.calculate_slope(projected_corners[1], projected_corners[3], pitch=True)
 
 		projected_state = (forward_roll, backward_roll, forward_pitch, backward_pitch)
 
